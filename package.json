@@ -1,0 +1,36 @@
+{
+  "name": "kunlun-preset",
+  "version": "1.0.0",
+  "private": true,
+  "description": "昆仑 (Kunlun) agent preset for DeepSeek Harness — the shipped standard preset plus five behaviour modules, persistent cross-session memory, and multi-model subagent routing.",
+  "type": "module",
+  "license": "Apache-2.0",
+  "bin": {
+    "kunlun-install": "./install.mjs"
+  },
+  "scripts": {
+    "install-preset": "node install.mjs",
+    "install:dry": "node install.mjs --dry-run",
+    "verify": "powershell -ExecutionPolicy Bypass -File ./verifiers/verify-all.ps1"
+  },
+  "files": [
+    "install.mjs",
+    "presets",
+    "mcp",
+    "lib",
+    "skills",
+    "verifiers",
+    "README.md",
+    "LICENSE",
+    "NOTICE"
+  ],
+  "engines": {
+    "node": ">=18"
+  },
+  "keywords": [
+    "dsh",
+    "deepseek-harness",
+    "agent-preset",
+    "kunlun"
+  ]
+}

@@ -1,0 +1,22 @@
+# Build output and local scratch — never ship these.
+node_modules/
+_cleanroom/
+*.log
+
+# Machine-specific resolved copies. The whole point of this repo is that one
+# artifact works on every machine, so a resolved copy is a local artifact, not a
+# source file.
+cordis.kunlun.yml
+*.resolved.yml
+
+# Editor / OS noise
+.vscode/
+.idea/
+Thumbs.db
+desktop.ini
+
+# Secrets. The API keys live in the user's own settings document, never here.
+.env
+.env.*
+*.key
+secrets.*

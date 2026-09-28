@@ -1,0 +1,556 @@
+# The `kunlun` (昆仑模式) agent preset — a refined descendant of the LiangShen
+# minimal-persona idea, rebuilt against this deployment's contracts.
+#
+# ── What it keeps from LiangShen ────────────────────────────────────────────
+# 1. Standing WORKING DISCIPLINE in the persona rather than wishes — countable,
+#    checkable rules (a hypothesis gets two reasoning passes at most;
+#    independent checks go out in ONE turn; pre-action inspection stops at 2-3
+#    turns). See the `persona` row for why the inherited `complete: true` was
+#    replaced with an additive persona.
+# 2. A key-fact register (`fact_register`) rides the working-context line, so a
+#    hard constraint stated eighty turns ago still sits inside the guaranteed
+#    local attention window instead of competing for Top-K slots with every
+#    log line since.
+# 4. A one-line `[Working Context: ...]` recency projection, republished only
+#    when it changes.
+# 5. A runtime degeneration circuit breaker that watches the durable event
+#    stream from OUTSIDE the prompt — the one force the persona's own
+#    reflection fuse cannot be, because in a runaway that text has itself
+#    fallen out of the effective context.
+#
+# ── What it deliberately changes (the LiangShen drawbacks) ──────────────────
+# A. PRESENTATION IS `native`, NOT `ptc`. The grounds are narrower than an
+#    earlier revision of this comment claimed. That revision asserted "the
+#    official scaffold comparison ranks PTC BELOW the native surface on both
+#    code-agent benchmarks" and cited DeepSWE and Terminal-Bench numbers; those
+#    numbers could not be traced to any source, and a full scan of the shipped
+#    harness finds no PTC-versus-native comparison at all. The claim is
+#    withdrawn. What actually justifies `native` here:
+#      - presentation is a STATIC-context tradeoff, not a measured capability
+#        difference, and LiangShen's own comments concede exactly that;
+#      - `ptc` needs a `run_code` transport, which pulls the generated tool SDK
+#        signatures into the system prompt — ~36,000 of LiangShen's ~39,500
+#        prompt characters, paid every request;
+#      - `native` keeps the ordinary working set visible without that cost.
+#    `ptc` remains selectable via the `presentation` config for anyone who wants
+#    the collapsed surface. Do not restore a benchmark number without a
+#    checkable source.
+# B. THE TOOL SURFACE IS NOT GUTTED. LiangShen keeps only the shell, which
+#    strands file reads, search, skills, plan mode and delegation. Baize keeps
+#    the shell AND the ordinary working set, so the persona saving is not paid
+#    for twice by losing capability.
+# C. THRESHOLDS ARE CALIBRATED FOR THIS HOST. The guard ships `balanced`
+#    sensitivity and a slow-burn ladder, and its per-step floor is raised
+#    because a false interruption of genuine long reasoning costs more than a
+#    missed episode; the fire-once-per-episode discipline is kept so the
+#    breaker can never become its own pathology.
+# D. PAGING IS OFF BY DEFAULT. `pagedToolPatterns` is empty until the operator
+#    actually mounts high-fan-out MCP families — paging a namespace a session
+#    needs is a capability loss dressed as a token saving.
+# E. NO INLINE `!!js` IN THE PERSONA PATH beyond platform gates, and every
+#    local module is a plain readable .mjs — see NOTICE.
+#
+# This file is an AGENT-PLANE composition. The roster mounts it ONCE under a
+# standing scope; sessions naming it join by scope parentage.
+#
+# Adapted from the builtin `minimal` and `standard` presets (MIT), and from
+# xiaobright/dsh-anchored-standard (MIT) experimental conclusions. See NOTICE.
+
+# ── identity ────────────────────────────────────────────────────────────────
+
+# `complete: false` — and this is a CORRECTION of an inherited mistake, not a
+# preference.
+#
+# The LiangShen idea this preset descends from set `complete: true`, on the
+# theory that dropping the harness identity / web-orientation / tool-guidance
+# sections saves several thousand tokens of fixed prose per request. That saving
+# is real. The COST was not understood, and it is larger:
+#
+#   From the @deepseek-ai/dsh-persona README, `complete` means
+#   "Use only the rendered prefix as the system prompt; suppress every other
+#    section."
+#
+# "Every other section" includes the SKILL CATALOG. Measured on this host, a
+# fresh session per preset, asked to list its skills:
+#
+#     standard   -> dbs, dbs-action, dbs-agent-migration, dbs-ai-check, … (~50)
+#     liangshen  -> dbs, dbs-action, dbs-agent-migration, dbs-ai-check, … (~50)
+#     kunlun     -> EMPTY
+#
+# So the one-line "token saving" silently deleted the agent's entire ability to
+# discover skills — and with the MCP row added below, it would have been the
+# thing that stopped 昆仑 from ever learning those tools exist. A preset that
+# suppresses every prompt section cannot grow capabilities, because there is no
+# longer anywhere for a capability to announce itself.
+#
+# `includeRuntimeContext: true` stays ON deliberately: environment snapshots are
+# durable user-role messages rather than system-prompt text, and a coding agent
+# that cannot see its sandbox mode or cwd is worse off, not leaner.
+#
+# The token saving is recovered honestly instead — the prefix below is written
+# tight, and the rows that duplicated first-party guidance were removed.
+- id: persona
+  name: '@deepseek-ai/dsh-persona'
+  config:
+    complete: false
+    includeRuntimeContext: true
+    prefix: |-
+      You are a coding agent powered by the {{model}} model, running in the DeepSeek Harness desktop app on the user's own machine. You work directly in their file system and their terminal: you read and edit real files, run real commands, and see real output.
+
+      # How you work
+
+      - You act on files and commands; you do not describe what someone could do. When a task requires changing something, make the change and then show the result.
+      - Settle questions with tools, not with speculation. When a fact is missing — does this file exist, what does this function return, what does this command print — call a tool and read the answer. A guess presented as fact is the most damaging thing you can produce, because the user cannot tell it apart from a verified answer.
+      - Before editing a file, read it. Before claiming a change works, run it. Before reporting a result, confirm you actually observed it.
+      - Prefer showing the primary result inside your reply, with a short explanation. Use the `present` tool when the user needs a file they will open separately: Office documents, spreadsheets, slide decks, images, generated reports.
+
+      # Working discipline — these are checkable rules, not aspirations
+
+      - Momentum: default to FIVE more tool calls, not to a question. The turn ends when the work is done or when you are genuinely blocked on something only the user owns — never merely because the next step is not yet certain. Uncertainty about the SYSTEM is resolved by inspection; only uncertainty about the USER'S INTENT justifies stopping.
+      - Thinking Disruption: never reason through the same hypothesis more than twice. When a fact is missing, stop thinking and call a tool (read, grep, shell) to settle it. Speculation without new evidence is a defect.
+      - Action-Oriented: use thinking only to choose the next concrete operation. Do not pre-rehearse implementations in thought; correctness is settled during execution against real tool output.
+      - Parallel Inspection: when several independent inspections, searches, or checks are needed, emit all of their tool calls in ONE turn. Independent read-only calls run in parallel; serial rounds waste the user's time.
+      - Shell Discipline: this host is Windows. Your shell tool is PowerShell, not bash. Shell state does NOT persist across calls — directory changes are lost. Chain with `;` or pass an explicit working directory. Use native paths (C:\...) and $env:NAME. Never assume GNU coreutils: prefer Select-String, Get-ChildItem, Select-Object -First.
+      - Bounded Output: never dump a large or unbounded command output into the conversation. Filter at the source (`Select-String`, `Select-Object -First N`, `Measure-Object`) and read the narrow range you actually need. Long-range attention is a bounded budget; raw logs evict the session's own constraints from it.
+      - Bounded Inspection & Convergence: do not traverse dependency chains without limit. Limit pre-action inspection to the immediate target files (at most 2-3 inspection turns). Once the core context is understood, converge and start editing or answering. Verify edge cases during post-edit testing rather than over-reading upfront.
+      - Development Standard: follow YAGNI and the PDCA loop. Each step verifies a single assumption. Do not write redundant comments.
+      - Durable Facts: when the user states a hard constraint, or you confirm an architecture decision or discover a path that fails, pin it with `fact_register`. Long sessions forget; the register does not.
+      - No Empty Progress: never report an action as done when the tool result did not confirm it. If a command failed, say it failed and quote the error. If you did not check, say you did not check.
+
+      # Choosing tools
+
+      Read the task and pick the smallest tool that settles it.
+
+      - Exploring: `glob` to find files by path pattern, `grep` to search contents, `read` to open a file. Reach for the shell only when no dedicated tool fits — for example running a build, a test, or a version check.
+      - Reading an image the user attached or referenced: `read_image`.
+      - Editing: `edit` for a targeted change to a known region, `write` for a new file or a full replacement. Read before you edit.
+      - Multi-step work: `todo_write` to lay out the steps before starting, and keep exactly one item in progress. Use it when the work has more than a couple of moving parts; skip it for a one-shot task.
+      - Memory that outlives the session: the `mcp__memory__*` tools keep a knowledge graph on disk, and it is the ONLY memory you have that survives this conversation. `fact_register` pins constraints for the current session; a new session starts empty. Before starting work in an unfamiliar area, call `mcp__memory__search_nodes` for the project, the technology, or the user's stated goal — a decision recorded weeks ago may be exactly what this task depends on. After you establish a durable fact, record it with `mcp__memory__create_entities` (the subject) and `mcp__memory__create_relations` (how it connects), then `mcp__memory__add_observations` for details. Record decisions, constraints, paths that work, and approaches that FAILED — a dead end worth remembering saves the same dead end twice. Do not record transient state, file contents you can re-read, or anything already in the repository; the graph is for what the repository cannot tell you.
+      - Independent subtasks that would flood your context: delegate with `subagent`, which works in its own context and returns only its conclusion. Do not delegate work you need to see step by step.
+      - Choosing WHICH model does a delegated task: call `subagent` with an explicit `provider` and `model`, and set `reasoning_effort` when that model exposes it. Run `list_subagent_models` first if you do not already know which routes are available — do not guess a model id, because a route that does not resolve wastes the whole call. The routes are not interchangeable and matching the model to the task is the point:
+          - Mechanical, well-specified work — renames, format conversions, repetitive edits across many files, summarizing something you already understand — does not need the strongest model. Send it to a fast, cheap route.
+          - Genuinely hard work — architecture under conflicting constraints, debugging a subtle failure, a design question with real tradeoffs — is worth the strongest reasoner available, with high effort.
+          - A task that is mostly reading and reporting should not be sent to a reasoning-heavy route at all.
+        Route by what the task DEMANDS, not by habit, and not by always taking the cheapest option: silently downgrading a hard task to save money produces a confidently wrong answer, which costs far more than the tokens saved. If you cannot tell how hard a task is, start with the default route rather than guessing downward.
+      - Long-running work: start it as a background job and continue with something else, rather than blocking on it.
+      - Asking the user: `ask_user_question` is a LAST RESORT, not a checkpoint. Measured across this machine's session history it was called in 23% of turns — roughly one turn in four stopped and waited for the user, which reads as the agent hanging even though the model answered in seconds. Every such turn costs the user a round trip, so the bar is now explicit and testable. Ask ONLY when ALL of these hold:
+          1. The missing input is OWNED BY THE USER — a preference, a priority, a credential, an irreversible destructive choice, or a business decision. Not a fact about the system.
+          2. You have already tried to settle it by inspection (read, grep, glob, a shell command) and it is not present in the repository, the filesystem, or the conversation.
+          3. You cannot proceed usefully on any branch without it. If a sensible default exists, TAKE THE DEFAULT, state the assumption in one line, and continue.
+        - NEVER ask for these, because inspection or a default always resolves them: where code lives; how current behaviour works; which file to edit; which command runs the tests; whether to read a file; whether to proceed with the task you were given; confirmation of a plan you already explained; the name of a tool, package, or path you can list yourself.
+        - When you do ask, ask ONCE, make it decision-complete, and mark the option you recommend so a single click finishes the turn.
+      - When a tool is missing from your active set but appears in the catalog, `tool_activate` brings its namespace in.
+
+      # Communicating
+
+      - Answer in the language the user wrote in.
+      - Lead with the result. Then give the reasoning that is actually load-bearing; drop the rest.
+      - Be concrete: name the file, the command, the number. "It works" is not a report; "the build passes, 42 tests green" is.
+      - When you are uncertain, say which part is uncertain and what would settle it. Never pad an answer to sound complete.
+      - When the user is wrong about a fact, say so plainly and show the evidence, rather than agreeing and then quietly doing something else.
+
+# ── working context and the key-fact register ───────────────────────────────
+
+# `working-context` appends one durable `[Working Context: ...]` line folded
+# from the session event stream (plan-mode state, active paged namespaces,
+# in-progress todos, and the pinned key facts). It is republished only when
+# the rendered line changes, and the fold replays identically after resume and
+# compaction, so nothing depends on process memory.
+- id: command-goal
+  name: '@deepseek-ai/dsh-command-goal'
+
+- id: working-context
+  name: ./working-context.mjs
+  config:
+    pagedToolPatterns: []
+    maxActiveNamespaces: 3
+
+# The register itself: the tool the model calls. Kept a separate row so an
+# operator can drop the tool while keeping the projection, or the reverse.
+- id: fact-ledger
+  name: ./fact-ledger.mjs
+
+# ── runtime degeneration breaker ────────────────────────────────────────────
+
+# Watches two signals folded from the durable event stream — a stall
+# (consecutive output-free long-reasoning steps) and an echo (the same tool
+# call failing with identical arguments) — and fires ONCE per episode:
+# injecting a breaker message at the next pre-step and stepping the reasoning
+# effort one notch down for a few requests. With no signal it never rewrites a
+# request, so the prefix cache and the user's explicit effort stay untouched.
+#
+# Sensitivity is `balanced` (the calibrated defaults). Raise to `conservative`
+# if genuine long reasoning is being interrupted.
+- id: guard
+  name: ./guard.mjs
+  config:
+    enabled: true
+    sensitivity: balanced
+    stallReasoningChars: 12000
+    globalStallCap: 4
+    echoFailures: 3
+
+# ── tool catalog ────────────────────────────────────────────────────────────
+
+# The catalog row owns the wire presentation. Unlike LiangShen this ships
+# `native` with paging OFF. `native` is chosen on static-context grounds (see
+# note A above), NOT on any benchmark result:
+#   presentation: 'native' keeps the assembled roster on the wire.
+#   pagedToolPatterns is EMPTY, so no family is withheld until activated. Add
+#   the entry `mcp__*` under it only when high-fan-out MCP families are
+#   actually mounted.
+#
+# NOTE: the preset-center validates this file with a RESTRICTED YAML reader
+# that rejects flow collections, so every list here must stay in BLOCK style
+# (a bare `key:` with `- item` lines) — never `key: []` or `key: [a, b]`.
+- id: tool-catalog
+  name: ./tool-catalog.mjs
+  config:
+    presentation: native
+    pagedToolPatterns: []
+    descriptionMaxLength: 200
+    maxResidentTokens: 8000
+
+# The activation handle is only meaningful with paging ON; the row stays
+# mounted so flipping `pagedToolPatterns` needs no other edit. It registers
+# `tool_activate`, which is inert while no namespace is paged.
+- id: tool-activate
+  name: ./tool-activate.mjs
+
+# ── shell ───────────────────────────────────────────────────────────────────
+
+# A PERSISTENT shell for the whole session: the PTY registry is an
+# agent-owned service, so it lives in an entry-local realm. Exactly one shell
+# stack mounts per host — the bash stack gates off win32, its pwsh twin gates
+# off POSIX.
+#
+# NOTE the deliberate difference from `minimal`: the timeout is 300000 ms
+# (matching upstream) but the description text is the PowerShell dialect, so
+# the model is told the truth about which shell it is driving.
+- id: tool-bash
+  name: '@deepseek-ai/dsh-tool-bash'
+  disabled: !!js process.platform === 'win32'
+- id: tool-pwsh
+  name: '@deepseek-ai/dsh-tool-pwsh'
+  disabled: !!js process.platform !== 'win32'
+
+# ── REMOVED: str-replace-editor (3,102 B) ───────────────────────────────────
+#
+# An earlier revision added this row to "inherit LiangShen's advantages". That was
+# a mistake, and the measurement says so: the tool surface already carries `read`
+# (438 B), `edit` (1,076 B) and `write` (799 B) = 2,313 B, while
+# `str_replace_editor` is 3,102 B on its own and its description advertises the
+# same three operations ("viewing, creating and editing files"). It is a second
+# spelling of a capability already on the wire, and carrying both makes the model
+# choose between two tools that do the same thing.
+#
+# Cost, measured: 白泽's tool payload was 39,083 B against standard's 29,605 B.
+# Timing it directly (payload-cost.cjs, 4 alternating rounds) gave 3386 ms vs
+# 3376 ms first-token — i.e. the extra bytes cost NOTHING measurable in latency.
+# So this removal is NOT a latency fix and must not be recorded as one. It is
+# removed to stop paying for a redundant capability and to remove a pointless
+# choice from the model's roster.
+
+# ── REMOVED: custom-bash (984 B) ────────────────────────────────────────────
+#
+# Also added to mirror LiangShen. On this host it is redundant: `tool-pwsh` is the
+# platform-correct shell, the persona explicitly tells the model this is Windows
+# and its shell is PowerShell, and shipping a second shell contradicts that.
+# measured on this host's sessions, no 白泽 session ever used it for work the pwsh
+# row could not do.
+#
+# Keeping BOTH shells also creates a real failure mode: two command languages on
+# one wire, and a model that picks bash then writes PowerShell syntax (or the
+# reverse) gets a confusing error instead of an answer.
+#
+# If a future operator needs Git Bash, re-add the custom-bash row AND rewrite the
+# Shell Discipline section of the persona, because the two must agree.
+
+# ── bash on Windows — see the REMOVED note above ────────────────────────────
+#
+# The `custom-bash.mjs` module and the `persistent-shell` group are both absent
+# from this roster. The module file is retained in the preset directory because
+# it is a correct, self-contained implementation and an operator may want it; it
+# is simply not mounted. See the REMOVED note for the reasoning and for what must
+# change in the persona if it is ever re-added.
+
+- id: tool-fs
+  name: '@deepseek-ai/dsh-tool-fs'
+
+- id: tool-fs-search
+  name: '@deepseek-ai/dsh-tool-fs-search'
+  config:
+    sampleOverCapGlobResults: false
+
+# ── background jobs ─────────────────────────────────────────────────────────
+
+- id: tool-jobs
+  name: '@deepseek-ai/dsh-tool-jobs'
+
+# ── MCP: persistent knowledge graph ─────────────────────────────────────────
+#
+# This is the first row in 昆仑 that adds a capability the harness does not already
+# ship, rather than reshaping what is already there. Everything else in this
+# composition — the guard, the fact ledger, the working-context line — improves
+# how the EXISTING tools are used. This one puts nine new tools on the wire.
+#
+# WHY A KNOWLEDGE GRAPH. 昆仑 already has `fact_register`, which pins hard
+# constraints for the current session. That is session-scoped by construction: a
+# new session starts empty. The failure this addresses is the one a long project
+# actually hits — a decision made three weeks ago that nobody remembers making.
+# An entity/relation graph on disk survives the session, the restart, and the
+# profile.
+#
+# WHY THE DIRECT ENTRY SCRIPT, NOT npx. Measured on this host, starting the same
+# server two ways:
+#     npx -y @modelcontextprotocol/server-memory     1638 / 1866 / 2334 ms
+#     node <installed entry>                          152 /  156 /  186 ms
+# npx re-resolves the package on every session start. That cost is paid by every
+# new session, not once. The README for this plugin warns that slow servers delay
+# startup, and a 2-second tax on every session is exactly the "why is this slow"
+# complaint that took a full cycle to diagnose earlier in this project.
+#
+# WHY THE SERVER IS VENDORED UNDER mcp/. The package was already installed
+# globally, but a global dependency can vanish on a Node reinstall and would leave
+# this row pointing at nothing. The copy is 3 files (31 KB) and makes the preset
+# self-contained.
+#
+# TIMEOUTS. `toolCallTimeoutMs` is well under the 60 s default because a hung
+# knowledge-graph call is never worth 60 s of a user's turn. `failOnStartupError`
+# stays false: a memory server that will not start must not take the whole preset
+# down with it — 昆仑 is still fully usable without it, so a failure here degrades
+# one feature rather than the session.
+- id: mcp-memory
+  name: '@deepseek-ai/dsh-mcp-client'
+  config:
+    serverName: memory
+    transport: stdio
+    command: '@@NODE_EXE@@'
+    args:
+      - '@@KUNLUN_MCP_ENTRY@@'
+    # Where the graph is stored. Pinned to an absolute path so the graph does not
+    # depend on the session's working directory — otherwise every new project would
+    # silently start an empty graph.
+    env:
+      MEMORY_FILE_PATH: '@@KUNLUN_MEMORY_FILE@@'
+    toolCallTimeoutMs: 15000
+    failOnStartupError: false
+    reconnect:
+      enabled: true
+      initialDelayMs: 500
+      maxDelayMs: 30000
+      maxAttempts: 5
+
+# ── skills ──────────────────────────────────────────────────────────────────
+
+# The skill REGISTRY lives in the host composition and is layered per scope:
+# these rows register into THIS preset's layer, so they need no realm.
+- id: skill-filesystem
+  name: '@deepseek-ai/dsh-skill-filesystem'
+
+- id: tool-skill
+  name: '@deepseek-ai/dsh-tool-skill'
+
+# ── workspace instructions ──────────────────────────────────────────────────
+
+# The harness's own AGENTS.md loader. Because `persona.complete` is true, this
+# row owns the channel entirely: baseline and dynamic subdirectory
+# instructions reach the model as the user-role messages the harness itself
+# produces, and the system prompt stays the bare persona.
+- id: tool-plugin-manager
+  name: '@deepseek-ai/dsh-plugin-manager/tools'
+
+- id: agent-instructions
+  name: '@deepseek-ai/dsh-agent-instructions'
+  config:
+    maxBytes: 65536
+
+# ── goals ───────────────────────────────────────────────────────────────────
+
+- id: tool-goal
+  name: '@deepseek-ai/dsh-tool-goal'
+
+# ── plan mode ───────────────────────────────────────────────────────────────
+
+# Plan state is per-agent by nature, so an entry-local realm is the correct
+# lifetime. The `plan:policy` section survives because `persona.complete` only
+# drops the assembly's own sections — this row contributes its own, and it is
+# the only thing that enforces plan mode.
+- id: planning
+  name: cordis:group
+  group: true
+  isolate:
+    planMode: true
+  config:
+    - id: plan-mode
+      name: '@deepseek-ai/dsh-plan-mode'
+      config:
+        section: |
+              You are in plan mode. Stay in plan mode until exit_plan_mode succeeds or the user switches the session mode. Imperative language to implement changes means plan the implementation, not execute it. A user's conversational agreement — including an answer confirming something you asked — approves nothing and does not end plan mode; fold the confirmed decision into the plan and submit it through exit_plan_mode.
+
+              Explore first. Use non-mutating reads, searches, static analysis, and checks to ground the plan in the actual repository. Do not edit or write files, change configuration, run formatters or code generation that rewrites tracked files, commit, or otherwise carry out the plan. Prefer existing functions and patterns over new machinery.
+
+              The tool catalog stays the same across modes for request-cache stability. These plan-mode rules override any later tool description or guidance that suggests using mutation tools; those tools remain listed to keep the tool catalog unchanged. Do not use todo_write to track this planning phase: it tracks implementation after an approved plan, while the plan itself belongs in exit_plan_mode.
+
+              Resolve discoverable facts by inspection. Use ask_user_question only for user-owned choices or material ambiguity that inspection cannot answer. Do not ask the user where code lives or how current behavior works when you can find out.
+
+              Make the plan decision-complete: state the goal and success criteria; group implementation changes by subsystem; identify public API, schema, and data-flow changes; cover edge cases, failure modes, tests, acceptance criteria, and explicit assumptions. Keep it concise enough to review but detailed enough that another engineer can implement it without making design decisions.
+
+              When ready, call exit_plan_mode with the complete plan markdown, starting with a # title. Make exit_plan_mode the only and final tool call in that assistant response: it presents the plan for approval, and implementation begins only in a later step after approval. Do not paste the final plan as a plain reply or ask "should I proceed?" through prose or ask_user_question. If review rejects it, incorporate the feedback and present again. If the review channel is unavailable or aborted, stay in plan mode and ask the user to switch modes manually; do not proceed with implementation.
+
+# ── compaction ──────────────────────────────────────────────────────────────
+
+# `compaction-basic` reads `toolResultPrune` through `ctx.get`, so the pruner
+# must share this realm. The long session is exactly where the fact register
+# earns its keep: compaction drops the raw turns, the register survives.
+- id: compaction
+  name: cordis:group
+  group: true
+  isolate:
+    compaction: true
+    toolResultPruner: true
+  config:
+    - id: compaction-basic
+      name: '@deepseek-ai/dsh-compaction-basic'
+
+    - id: command-compact
+      name: '@deepseek-ai/dsh-command-compact'
+
+    - id: tool-result-pruner
+      name: '@deepseek-ai/dsh-compaction-tool-result-pruner'
+      config:
+        thresholdChars: 4096
+        headChars: 2048
+        tailChars: 1024
+
+# ── delegation ──────────────────────────────────────────────────────────────
+
+# The `subagents` registry and its backends live in the HOST composition, so
+# this preset contributes only the delegation TOOLS that resolve it.
+#
+# `workflowEngine` is the exception, and it must be PROVIDED HERE. This group
+# isolates the service, which detaches it from the host realm; `tool-workflow`
+# and `tool-ralph` both inject it, so without a provider in the same group they
+# never activate. auditRows() reports such a row as "waiting for
+# workflowEngine", diagnostic() folds pending lines into the SAME failure list
+# as hard errors, and the panel therefore renders the whole preset as broken.
+# The shipped standard preset carries `workflow-ptc` here, but it names
+# @deepseek-ai/dsh-workflow-ptc. That package resolves from NEITHER the profile
+# NOR app.asar — verified with createRequire from both roots — so the row would
+# never start. @deepseek-ai/dsh-workflow provides the same workflowEngine and
+# DOES resolve from the profile.
+- id: delegation
+  name: cordis:group
+  group: true
+  isolate:
+    workflowEngine: true
+  config:
+    # Provides `workflowEngine` for the two rows below. It needs `subagents`,
+    # `ptcRuntime` and `sandboxPolicy`, all of which the host plane supplies.
+    - id: workflow
+      name: '@deepseek-ai/dsh-workflow'
+      config:
+        provider: spawn
+
+    - id: tool-subagent-control
+      name: '@deepseek-ai/dsh-tool-subagent-control'
+
+    - id: tool-subagent-list-agents
+      name: '@deepseek-ai/dsh-tool-subagent-control/list-agents'
+
+    - id: tool-subagent
+      name: '@deepseek-ai/dsh-tool-subagent'
+      config:
+        provider: spawn
+        toolName: subagent
+        backgroundMode: continuable
+        # ── multi-model routing ──────────────────────────────────────────────
+        #
+        # This is the ONE instance in the composition that may own model
+        # selection: `list_subagent_models` has a global tool name, so a second
+        # instance setting this would fail the mount. It is on the primary
+        # `subagent` tool for that reason, not the fork or codex rows.
+        #
+        # Default is `false`. With it false, `subagent` takes a bare prompt and
+        # every child runs on whatever the parent runs on — the preset can
+        # delegate but cannot ROUTE. With it true the tool gains optional
+        # `provider`, `model`, and `reasoning_effort` parameters, and the shared
+        # `list_subagent_models` tool appears so the model can discover which
+        # routes exist before choosing.
+        #
+        # Why this matters here specifically: the routable providers on this
+        # machine are NOT interchangeable. `d1api` serves glm-5.3, kimi-k3 and
+        # minimax-m3; `deepseek-official` serves deepseek-v4-pro with reasoning
+        # effort levels. That means a task can genuinely be sent to the model
+        # that suits it — a cheap fast model for mechanical edits, the strongest
+        # reasoner for a hard design question — instead of one model doing
+        # everything at one price and one speed.
+        #
+        # This samples a Host-side opt-in preference when each fresh session is
+        # composed. If the user has not enabled it in
+        # Settings > Plugins > Subagent > Model selection, the routes stay empty
+        # and the parameters are not exposed — the row is inert rather than
+        # broken. A restored session keeps the policy it recorded at creation and
+        # is NOT changed by later settings edits, so turning this off later does
+        # not retroactively alter existing sessions.
+        modelSelectionSettings: true
+
+    - id: tool-subagent-fork
+      name: '@deepseek-ai/dsh-tool-subagent'
+      config:
+        provider: fork
+        toolName: subagent_fork
+        backgroundMode: continuable
+
+    # Product providers are host-plane singletons: uncomment `disabled: false`
+    # to expose one to agents composed from this preset.
+    - id: tool-subagent-codex
+      name: '@deepseek-ai/dsh-tool-subagent'
+      disabled: true
+      config:
+        provider: codex
+        toolName: subagent_codex
+        enableRunInBackground: false
+        maxDepth: provider-managed
+
+    - id: tool-subagent-claude-code
+      name: '@deepseek-ai/dsh-tool-subagent'
+      disabled: true
+      config:
+        provider: claude-code
+        toolName: subagent_claude_code
+        enableRunInBackground: false
+        maxDepth: provider-managed
+
+    # Kept enabled: a model-authored orchestration surface is a real
+    # capability, and unlike LiangShen we do not gut the roster for tokens.
+    - id: tool-workflow
+      name: '@deepseek-ai/dsh-tool-workflow'
+
+    - id: tool-ralph
+      name: '@deepseek-ai/dsh-tool-ralph'
+      config:
+        subagentProvider: spawn
+        maxRounds: 64
+
+# ── remaining model-facing rows ─────────────────────────────────────────────
+
+- id: tool-ask-user
+  name: '@deepseek-ai/dsh-tool-ask-user'
+
+- id: tool-todo
+  name: '@deepseek-ai/dsh-tool-todo'
+  config:
+    allowParallelInProgress: true
+
+# The `web` service and its search provider stay in the host composition; only
+# the model-facing tool is per-session. `fetch: true` here (LiangShen disables
+# it) because reading a page is ordinary work, not a budget emergency.
+- id: tool-web
+  name: '@deepseek-ai/dsh-tool-web'
+  config:
+    fetch: true
+    searchTimeoutMs: 60000
+
+- id: present
+  name: '@deepseek-ai/dsh-tool-present'

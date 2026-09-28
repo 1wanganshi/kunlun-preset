@@ -1,0 +1,50 @@
+昆仑 (Kunlun) — DeepSeek Harness agent preset
+Copyright 2026
+
+This product includes software developed as part of the DeepSeek Harness
+ecosystem.
+
+--------------------------------------------------------------------------------
+THIRD-PARTY COMPONENTS
+--------------------------------------------------------------------------------
+
+1. @modelcontextprotocol/server-memory
+   Vendored at mcp/server-memory/ (MIT License).
+   Upstream: https://github.com/modelcontextprotocol/servers
+   The knowledge-graph memory server. Vendored rather than installed on demand
+   because launching it through `npx -y` measured 1638-2334 ms per start
+   (6.9 s cold) against 152-186 ms for the installed entry point — a 12x
+   difference paid on every session boot.
+
+2. DeepSeek Harness (@deepseek-ai/*)
+   Not redistributed. This package installs INTO an existing DeepSeek Harness
+   profile and references the harness packages that are already present.
+
+--------------------------------------------------------------------------------
+DESIGN PROVENANCE
+--------------------------------------------------------------------------------
+
+The agent preset in presets/ is written against the public contracts of the
+DeepSeek Harness plugin system (@deepseek-ai/dsh-agent-preset,
+@deepseek-ai/dsh-tool-subagent, @deepseek-ai/dsh-mcp-client,
+@deepseek-ai/dsh-skill-filesystem and others).
+
+It was informed by studying the behaviour of a third-party preset
+(@linxin666/dsh-liangshen, "梁神"). No code from that package is included here.
+The preset's comments record where a design decision was made in response to
+observed behaviour — including the cases where that preset's approach was
+deliberately NOT followed — because a stated reason is reviewable and an
+unstated one is not.
+
+--------------------------------------------------------------------------------
+MEASURED CLAIMS
+--------------------------------------------------------------------------------
+
+Numbers in README.md and in the composition's comments come from measurements
+taken on a specific machine (Windows, 586 stored sessions, ~1,044 recorded tool
+failures). They describe what was observed there. They are not benchmarks and
+should not be read as general performance figures.
+
+Where a claim could not be verified it is marked as withdrawn rather than
+deleted, so the correction stays visible. See the notes on `workflow-ptc` and on
+`presentation: native` in presets/kunlun/agent.cordis.yml.
