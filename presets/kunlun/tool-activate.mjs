@@ -16,7 +16,7 @@
 import { integerAtLeast, validatePagedToolPatterns, DEFAULT_MAX_ACTIVE_NAMESPACES } from './paging.mjs'
 
 /** Cordis plugin name used by loader diagnostics. */
-export const name = 'baize-tool-activate'
+export const name = 'kunlun-tool-activate'
 
 /** The tools registry must exist before the activation tool can register. */
 export const inject = ['tools']

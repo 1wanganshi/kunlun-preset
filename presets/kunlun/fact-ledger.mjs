@@ -29,7 +29,7 @@
 import { parseArguments } from './paging.mjs'
 
 /** Cordis plugin name used by loader diagnostics. */
-export const name = 'baize-fact-ledger'
+export const name = 'kunlun-fact-ledger'
 
 /** The tools registry must exist before the ledger tool can register. */
 export const inject = ['tools']

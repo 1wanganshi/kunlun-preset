@@ -66,7 +66,8 @@ $suites = @(
   'verify-isolate.mjs',         # preset services run in isolate realms
   'verify-resolvable.mjs',      # every package a row names actually resolves
   'verify-declaration.mjs',     # the preset is declared exactly once
-  'verify-module-config.mjs'    # no valueless YAML key where an array is required
+  'verify-module-config.mjs',   # no valueless YAML key where an array is required
+  'verify-session-format.mjs'   # stored sessions stay loadable (v4 source kinds)
 )
 
 $failed = 0

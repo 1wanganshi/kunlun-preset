@@ -55,7 +55,7 @@
 import { parseArguments, sessionEvents } from './paging.mjs'
 
 /** Cordis plugin name used by loader diagnostics. */
-export const name = 'baize-guard'
+export const name = 'kunlun-guard'
 
 /**
  * Consecutive qualifying steps the per-step ladder requires. TWO, not one:
@@ -329,9 +329,15 @@ export function apply(ctx, config = {}) {
       '- Do not restate the problem or re-derive what you already know.',
     ].join('\n')
 
-    const message = { role: 'user', content: [{ type: 'text', text }], source: { plugin: name }, id: `${name}:breaker` }
+    // `kind: name` is the v4 producer-owned shape. It used to be
+    // `source: { plugin: name }` (v3), which made the loader reject the ENTIRE
+    // session as corrupt once the app restarted, so the conversation could never be
+    // reopened. See the long note in tool-catalog.mjs — same defect, same cause.
+    const message = { role: 'user', content: [{ type: 'text', text }], source: { kind: name }, id: `${name}:breaker` }
     const messages = Array.isArray(decision?.messages) ? decision.messages : []
-    const others = messages.filter(item => item?.source?.plugin !== name)
+    // Match on `kind` now. Checking the old `plugin` field would stop recognising
+    // our own previous message and duplicate the breaker on every pass.
+    const others = messages.filter(item => item?.source?.kind !== name)
     return { ...decision, messages: [...others, message] }
   }, { prepend: true })
 }

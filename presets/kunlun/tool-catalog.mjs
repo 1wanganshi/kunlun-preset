@@ -64,7 +64,7 @@ import {
 } from './paging.mjs'
 
 /** Cordis plugin name used by loader diagnostics. */
-export const name = 'baize-tool-catalog'
+export const name = 'kunlun-tool-catalog'
 
 /** The systemPrompt service must exist before the catalog can re-assemble. */
 export const inject = ['systemPrompt']
@@ -172,7 +172,29 @@ export function createCatalogMessage(entries, presentation, inactive, maxLength)
   return {
     role: 'user',
     content: [{ type: 'text', text: renderCatalogText(entries, presentation, inactive, maxLength) }],
-    source: { plugin: name },
+    // The v4 session format requires a PRODUCER-OWNED `kind` here.
+    //
+    // THIS LINE WAS A DATA-LOSS BUG. It used to read `source: { plugin: name }`,
+    // which is the v3 shape: a `plugin` field and no `kind`. v4 validation rejects
+    // any message whose source kind is not producer-owned, and it rejects the WHOLE
+    // session, not just the message:
+    //
+    //     SessionFormatError: format v4 message requires a producer-owned source kind
+    //     -> 历史加载失败: stored session "..." is corrupt
+    //
+    // Because this module injects a message on every turn, every session that ran
+    // under the preset became unloadable after a restart — the conversation could
+    // not be reopened and its history disappeared from the list. The preset still
+    // WORKED, which is why it went unnoticed: only the stored history was destroyed,
+    // and only after the app restarted.
+    //
+    // `kind: name` is the shape the harness's own injected messages use — the
+    // system prompt writes {"kind":"system-prompt"}, runtime context writes
+    // {"kind":"runtime-context"}, the skill catalog writes {"kind":"skill-catalog"}.
+    // A reference preset's equivalent module writes {"kind":"<name>-tool-catalog"}.
+    // The bare name is correct; `{"kind":"plugin", plugin: name}` is the migration
+    // form for legacy records and appears in zero healthy sessions.
+    source: { kind: name },
     id: CATALOG_MESSAGE_ID,
   }
 }
@@ -276,7 +298,10 @@ export function apply(ctx, config = {}) {
 
     const message = createCatalogMessage(entries, presentation, inactive, maxLength)
     const messages = Array.isArray(decision?.messages) ? decision.messages : []
-    const existing = messages.find(item => item?.id === CATALOG_MESSAGE_ID || item?.source?.plugin === name)
+    // Match our own previous message by id OR by the current `kind`. The id check
+    // alone is not enough across a format change, and the old `source.plugin` check
+    // would no longer recognise a message written under the corrected shape.
+    const existing = messages.find(item => item?.id === CATALOG_MESSAGE_ID || item?.source?.kind === name)
     const text = message.content[0].text
     if (existing !== undefined) {
       const current = Array.isArray(existing.content) ? existing.content[0]?.text : undefined

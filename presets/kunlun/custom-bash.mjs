@@ -1,11 +1,11 @@
 /**
- * custom-bash — a Windows-capable `bash` tool for the baize preset. It
+ * custom-bash — a Windows-capable `bash` tool for the kunlun preset. It
  * registers under the SAME name (`bash`) as the persistent shell so every
  * platform exposes one shell tool of that name, but executes through
  * `ctx.subprocess.spawn` instead of a PTY.
  *
  * Ported from LiangShen's module of the same name, which in turn was ported
- * from xiaobright/dsh-anchored-standard (MIT) — see NOTICE. Baize inherits it
+ * from xiaobright/dsh-anchored-standard (MIT) — see NOTICE. Kunlun inherits it
  * because it is a genuine capability: without it, Windows sessions have only
  * PowerShell, and any bash-syntax script, snippet, or documentation example
  * dead-ends.
@@ -46,7 +46,7 @@ import { access } from 'node:fs/promises'
 import { dirname, join } from 'node:path'
 
 /** Cordis plugin name used by loader diagnostics. */
-export const name = 'baize-custom-bash'
+export const name = 'kunlun-custom-bash'
 
 /** The subprocess and tools services must exist before this tool can register. */
 export const inject = ['subprocess', 'tools']

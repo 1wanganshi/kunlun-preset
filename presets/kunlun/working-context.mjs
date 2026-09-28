@@ -34,7 +34,7 @@ import {
 import { foldFactLedger, renderLedgerField } from './fact-ledger.mjs'
 
 /** Cordis plugin name used by loader diagnostics. */
-export const name = 'baize-working-context'
+export const name = 'kunlun-working-context'
 
 /** Cap one rendered todo title so the line stays a single glance. */
 const MAX_TITLE_CHARS = 80
@@ -128,14 +128,21 @@ function textOf(message) {
 export function apply(ctx, config = {}) {
   const patterns = validatePagedToolPatterns(name, config.pagedToolPatterns)
   const maxActive = integerAtLeast(name, config.maxActiveNamespaces, 'maxActiveNamespaces', 1, DEFAULT_MAX_ACTIVE_NAMESPACES)
-  const source = { plugin: name }
+  // v4 producer-owned shape. This was `{ plugin: name }` (v3), which made the
+  // loader reject the entire stored session as corrupt on the next app start —
+  // every conversation run under the preset became unopenable. Because this module
+  // publishes on most steps, it was the single largest source of the damage.
+  // See tool-catalog.mjs for the full account.
+  const source = { kind: name }
   const messageId = `${name}:context`
 
   ctx.on('agent/pre-step', (decision, session) => {
     const events = sessionEvents(session)
     const line = renderWorkingContext(events, { pagedToolPatterns: patterns, maxActiveNamespaces: maxActive })
     const messages = Array.isArray(decision?.messages) ? decision.messages : []
-    const existing = messages.find(message => message?.source?.plugin === name || message?.id === messageId)
+    // Match on `kind` as well as id, so our own message is still recognised after
+    // the shape change instead of being duplicated on every step.
+    const existing = messages.find(message => message?.source?.kind === name || message?.id === messageId)
 
     // Nothing to say and nothing published: leave the step untouched.
     if (line === undefined) {

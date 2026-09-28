@@ -12,7 +12,7 @@
  */
 
 /** Cordis plugin name used by loader diagnostics. */
-export const name = 'baize-paging'
+export const name = 'kunlun-paging'
 
 /** Matcher families withheld from the wire until activated. Empty by default. */
 export const DEFAULT_PAGED_TOOL_PATTERNS = []
