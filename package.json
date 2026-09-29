@@ -1,6 +1,6 @@
 {
   "name": "kunlun-preset",
-  "version": "1.3.0",
+  "version": "1.4.0",
   "private": true,
   "description": "昆仑 (Kunlun) agent preset for DeepSeek Harness — the shipped standard preset plus five behaviour modules, persistent cross-session memory, and multi-model subagent routing.",
   "type": "module",
