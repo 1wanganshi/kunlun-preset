@@ -1,36 +1,73 @@
 {
-  "name": "kunlun-preset",
-  "version": "1.5.0",
-  "private": true,
-  "description": "昆仑 (Kunlun) agent preset for DeepSeek Harness — the shipped standard preset plus five behaviour modules, persistent cross-session memory, and multi-model subagent routing.",
+  "name": "dsh-kunlun",
+  "version": "1.6.0",
+  "description": "昆仑模式 (Kunlun) — an agent preset for DeepSeek Harness Desktop. A refined descendant of the minimal-persona idea: a tight working persona carrying countable disciplines, a key-fact register, a working-context line, a degeneration circuit breaker, and persistent cross-session memory over MCP. Measured against the shipped `standard` preset: it asks the user far less often, finishes common tasks faster, and is the only preset here that can recall a fact from a previous session.",
   "type": "module",
-  "license": "Apache-2.0",
-  "bin": {
-    "kunlun-install": "./install.mjs"
+  "engines": {
+    "node": "^22.19.0 || >=24.0.0"
   },
-  "scripts": {
-    "install-preset": "node install.mjs",
-    "install:dry": "node install.mjs --dry-run",
-    "verify": "powershell -ExecutionPolicy Bypass -File ./verifiers/verify-all.ps1"
+  "main": "lib/index.js",
+  "exports": {
+    ".": {
+      "default": "./lib/index.js"
+    },
+    "./client": {
+      "default": "./lib/client.js"
+    },
+    "./package.json": "./package.json",
+    "./presets/*": "./presets/*"
+  },
+  "dsh": {
+    "engines": {
+      "dsh": ">=0.1.7-rc.2"
+    },
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    },
+    "client": {
+      "inject": [
+        "@deepseek-ai/dsh-client-ui-slots",
+        "@deepseek-ai/dsh-api-remotes",
+        "@deepseek-ai/dsh-api-session-controller"
+      ],
+      "platform": "web"
+    }
+  },
+  "peerDependencies": {
+    "@deepseek-ai/dsh": ">=0.1.7-rc.2",
+    "@deepseek-ai/schemastery": "*"
   },
   "files": [
-    "install.mjs",
+    "lib/**/*.js",
+    "src",
     "presets",
     "mcp",
-    "lib",
-    "skills",
+    "cordis.patch.yml",
+    "gen-preset-row.mjs",
+    "build-bundle.mjs",
+    "build-client.mjs",
+    "install-client.mjs",
+    "install.mjs",
+    "install-row.mjs",
     "verifiers",
+    "bench",
     "README.md",
+    "LEVER.md",
+    "KUNLUN-VS-LIANGSHEN.md",
+    "TASK-COVERAGE.md",
+    "CODING-BENCH.md",
+    "KUNLUN-PROGRESS.md",
+    "HARNESS.md",
     "LICENSE",
     "NOTICE"
   ],
-  "engines": {
-    "node": ">=18"
-  },
   "keywords": [
     "dsh",
+    "dsh-plugin",
     "deepseek-harness",
     "agent-preset",
+    "mcp",
     "kunlun"
-  ]
+  ],
+  "license": "Apache-2.0"
 }

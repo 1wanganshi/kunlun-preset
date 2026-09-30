@@ -1,0 +1,19 @@
+# dsh-kunlun bundle patch: mounts 昆仑's browser half.
+#
+# Applied as a profile bundle layer whenever `dsh-kunlun` is listed in the profile's
+# `dsh.profile.bundles`. This file is read as the bundle OVERLAY during composition; a
+# bundle whose overlay is missing is skipped by the launcher with an ENOENT, and the
+# client half then never registers — silently, with no error visible in the GUI.
+#
+# The preset DECLARATION (the `kunlun` agent preset itself) is written into the
+# profile's own cordis.patch.yml by install-row.mjs, as an
+# `@deepseek-ai/dsh-agent-preset` row, because that path needs no package installed.
+# This bundle instead mounts the composer lever, which does need one.
+#
+# - insert: is REQUIRED for a new row. A bare top-level `- id:` is a PATCH against an
+#   existing entry and is silently dropped when no such entry exists — exactly how an
+#   earlier version of this file failed with no error anywhere.
+
+- insert:
+    - id: web-ui-kunlun
+      name: dsh-kunlun
