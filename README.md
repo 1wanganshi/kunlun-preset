@@ -83,23 +83,32 @@
 
 ## 安装
 
+**一条命令装完所有东西** —— 预设、多模型路由、技能、以及输入框旁边的「昆仑模式」拨杆：
+
 ```bash
+git clone https://github.com/1wanganshi/kunlun-preset.git
+cd kunlun-preset
 node install.mjs
 ```
 
 然后**重启 DeepSeek Harness Desktop**，在 `设置 → Agent 预设` 选 **昆仑模式**。
 
-重启是必须的，有三件事在会话启动时才发生：
+> **前提**：DeepSeek Harness Desktop 至少启动过一次（安装器要写进它的 profile 目录）。
+> 如果没启动过，安装器会明确告诉你，不会写坏任何东西。
 
-1. 预设本身在会话启动时组装
-2. 路由偏好**在会话启动时采样**（改设置不影响已开始的会话）
-3. MCP 记忆服务器随 profile 启动
-
-### 选项
+### 先看看会改什么
 
 ```bash
-node install.mjs --dry-run        # 只显示会改什么，不写任何东西
-node install.mjs --profile <dir>  # 装到指定 profile
+node install.mjs --dry-run        # 只打印计划，不写任何文件
+node install.mjs --profile <dir>  # 装到指定的 profile 目录
+```
+
+### 只装拨杆
+
+预设已经装好了，只想要那个拨杆：
+
+```bash
+node install-client.mjs
 ```
 
 ### 安装器做了什么
@@ -113,6 +122,29 @@ node install.mjs --profile <dir>  # 装到指定 profile
 | 5 | 把 `selectedDefault` 设为 `kunlun` |
 | 6 | **写入路由偏好**（漏了这步，路由静默失效） |
 | 7 | 安装技能到 `<dshHome>/skills` |
+| 8 | **安装拨杆**（客户端半边，登记为 bundle） |
+
+所有步骤都会打印它到底做了什么。**第 8 步失败不会影响预设本身** —— 预设照常工作，
+只是没有拨杆，安装器会明确说出来而不装作成功。
+
+### 卸载
+
+```bash
+node install.mjs --uninstall            # 先看计划：加上 --dry-run
+```
+
+它会删掉两个包目录、`cordis.kunlun.yml` 注册行，以及 `package.json` 里的两条登记。
+**不会**动你的 `selectedDefault`（除非它正好指向 `kunlun`，那时会提示你改回 `standard`）。
+
+### 为什么必须重启
+
+有三件事只在会话启动时发生：
+
+1. 预设本身在会话启动时组装
+2. 路由偏好**在会话启动时采样**（改设置不影响已开始的会话）
+3. MCP 记忆服务器随 profile 启动
+
+（技能是例外 —— harness 监听那个目录，**装完技能不用重启**。）
 
 ---
 

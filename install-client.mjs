@@ -11,13 +11,34 @@
  * bundle with an ENOENT and the client half never registers, silently.
  */
 import { readFileSync, writeFileSync, mkdirSync, copyFileSync, existsSync, rmSync, readdirSync, statSync } from 'node:fs'
-import { join, dirname } from 'node:path'
+import { join, dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { homedir } from 'node:os'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
-const PROFILE = 'C:/Users/Lenovo/.dsh/profiles/desktop'
+
+/**
+ * Resolve the desktop profile the same way the harness does, so this works on a machine
+ * that is not the author's. An explicit `--profile <dir>` always wins; otherwise
+ * `DSH_PROFILE_DIR`, then the conventional `<dshHome>/profiles/desktop`.
+ */
+function resolveProfile() {
+  const i = process.argv.indexOf('--profile')
+  if (i !== -1 && process.argv[i + 1]) return resolve(process.argv[i + 1])
+  if (process.env.DSH_PROFILE_DIR) return resolve(process.env.DSH_PROFILE_DIR)
+  const home = process.env.DSH_HOME ?? join(homedir(), '.dsh')
+  return join(home, 'profiles', 'desktop')
+}
+
+const PROFILE = resolveProfile()
 const DEST = join(PROFILE, 'node_modules', 'dsh-kunlun')
 const PROFILE_PKG = join(PROFILE, 'package.json')
+
+/**
+ * A Windows-style absolute path inside a module specifier must be a file:// URL, or the
+ * loader treats `C:` as a protocol and refuses to import it.
+ */
+const asUrl = (p) => 'file:///' + p.replace(/\\/g, '/')
 
 /** Files and directories the installed package needs. */
 const INCLUDE = ['lib', 'presets', 'mcp', 'skills', 'cordis.patch.yml', 'package.json']

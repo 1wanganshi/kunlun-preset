@@ -1,6 +1,6 @@
 {
   "name": "dsh-kunlun",
-  "version": "1.6.0",
+  "version": "1.7.0",
   "description": "昆仑模式 (Kunlun) — an agent preset for DeepSeek Harness Desktop. A refined descendant of the minimal-persona idea: a tight working persona carrying countable disciplines, a key-fact register, a working-context line, a degeneration circuit breaker, and persistent cross-session memory over MCP. Measured against the shipped `standard` preset: it asks the user far less often, finishes common tasks faster, and is the only preset here that can recall a fact from a previous session.",
   "type": "module",
   "engines": {
@@ -42,13 +42,13 @@
     "src",
     "presets",
     "mcp",
+    "skills",
     "cordis.patch.yml",
-    "gen-preset-row.mjs",
-    "build-bundle.mjs",
     "build-client.mjs",
     "install-client.mjs",
     "install.mjs",
-    "install-row.mjs",
+    "measure-context.mjs",
+    "verify-lever-browser.mjs",
     "verifiers",
     "bench",
     "README.md",
@@ -56,8 +56,6 @@
     "KUNLUN-VS-LIANGSHEN.md",
     "TASK-COVERAGE.md",
     "CODING-BENCH.md",
-    "KUNLUN-PROGRESS.md",
-    "HARNESS.md",
     "LICENSE",
     "NOTICE"
   ],

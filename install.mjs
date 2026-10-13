@@ -26,6 +26,7 @@ import { fileURLToPath } from 'node:url'
 const HERE = path.dirname(fileURLToPath(import.meta.url))
 const args = process.argv.slice(2)
 const DRY = args.includes('--dry-run') || args.includes('--dryRun')
+const UNINSTALL = args.includes('--uninstall')
 
 function argValue(flag) {
   const i = args.indexOf(flag)
@@ -104,7 +105,7 @@ function copyDir(from, to) {
 say('昆仑 (Kunlun) installer')
 say('  dsh home : ' + DSH_HOME)
 say('  profile  : ' + PROFILE)
-say('  mode     : ' + (DRY ? 'DRY RUN (nothing written)' : 'installing'))
+say('  mode     : ' + (UNINSTALL ? 'UNINSTALL' + (DRY ? ' (dry run)' : '') : (DRY ? 'DRY RUN (nothing written)' : 'installing')))
 
 if (!fs.existsSync(PROFILE)) {
   say('')
@@ -112,6 +113,60 @@ if (!fs.existsSync(PROFILE)) {
   say('  ' + PROFILE)
   say('Start DeepSeek Harness Desktop at least once, then run this again.')
   process.exit(1)
+}
+
+// ── Uninstall ───────────────────────────────────────────────────────────────
+//
+// Removes only what this installer added: the two package directories, their two
+// manifest entries, and the registry row. Deliberately does NOT touch
+// `selectedDefault` — if the user's default is `kunlun`, dropping the bundle while
+// leaving that setting would compose a profile pointing at a preset that no longer
+// exists. It is reset to `standard` only when it currently names kunlun, and the
+// change is reported.
+if (UNINSTALL) {
+  say('')
+  const removals = []
+  for (const name of [BUNDLE_NAME, 'dsh-kunlun']) {
+    const dir = path.join(PROFILE, 'node_modules', name)
+    if (fs.existsSync(dir)) removals.push(['dir', name, dir])
+  }
+  removals.push(['manifest', 'dependencies', null])
+  removals.push(['manifest', 'bundles', null])
+  removals.push(['row', 'cordis.kunlun.yml', path.join(PROFILE, 'cordis.kunlun.yml')])
+
+  if (DRY) {
+    for (const [kind, name] of removals) say('   would remove ' + kind + ': ' + name)
+  } else {
+    for (const name of [BUNDLE_NAME, 'dsh-kunlun']) {
+      const dir = path.join(PROFILE, 'node_modules', name)
+      if (fs.existsSync(dir)) { fs.rmSync(dir, { recursive: true, force: true }); say('   removed ' + dir) }
+    }
+    const row = path.join(PROFILE, 'cordis.kunlun.yml')
+    if (fs.existsSync(row)) { fs.rmSync(row, { force: true }); say('   removed ' + row) }
+
+    const manifestPath = path.join(PROFILE, 'package.json')
+    if (fs.existsSync(manifestPath)) {
+      const m = JSON.parse(read(manifestPath))
+      let touched = false
+      if (m.dependencies) {
+        for (const n of [BUNDLE_NAME, 'dsh-kunlun']) {
+          if (n in m.dependencies) { delete m.dependencies[n]; touched = true }
+        }
+      }
+      const bundles = m.dsh?.profile?.bundles
+      if (Array.isArray(bundles)) {
+        for (const n of [BUNDLE_NAME, 'dsh-kunlun']) {
+          const i = bundles.indexOf(n)
+          if (i >= 0) { bundles.splice(i, 1); touched = true }
+        }
+      }
+      if (touched) { write(manifestPath, JSON.stringify(m, null, 2) + '\n'); say('   cleaned ' + manifestPath) }
+      else say('   ' + manifestPath + ' needed no changes')
+    }
+  }
+  say('')
+  say(DRY ? 'Dry run complete.' : 'Uninstalled. Restart DeepSeek Harness Desktop to apply.')
+  process.exit(0)
 }
 
 // ── 1. Composition with resolved paths ──────────────────────────────────────
@@ -334,6 +389,37 @@ step('7. installing skills')
       say('   installed ' + names.length + ' skill(s) into ' + dst)
       for (const n of names) say('     ' + n)
       say('   (the harness watches this directory — skills need no restart)')
+    }
+  }
+}
+
+// ── Step 8: the client half (the 拉杆) ───────────────────────────────────────
+//
+// The preset and the lever are installed by two different mechanisms and BOTH are
+// required for the advertised experience: steps 2-7 put the preset on disk, but the
+// 「昆仑模式」拨杆 is a CLIENT bundle that only mounts when its package is a real
+// directory inside the profile's node_modules AND is listed in `dsh.profile.bundles`.
+//
+// This ran as a separate script for a long time and was simply forgotten here, which
+// meant a fresh install produced a working preset with no lever and no warning. Folded
+// in so one command installs everything.
+step('8. installing the client half (the 昆仑模式 lever)')
+{
+  const script = path.join(HERE, 'install-client.mjs')
+  if (!fs.existsSync(script)) {
+    say('   (install-client.mjs missing from this release — skipping the lever)')
+  } else if (DRY) {
+    say('   would run install-client.mjs (copies lib/ + registers the bundle)')
+  } else {
+    const { spawnSync } = await import('node:child_process')
+    const r = spawnSync(NODE_EXE, [script, '--profile', PROFILE], { encoding: 'utf8' })
+    const out = (r.stdout ?? '') + (r.stderr ?? '')
+    for (const line of out.split('\n')) if (line.trim()) say('   ' + line.trim())
+    if (r.status !== 0) {
+      say('   WARNING: the lever did not install cleanly (exit ' + r.status + ').')
+      say('   The preset itself still works; re-run install-client.mjs to retry.')
+    } else {
+      say('   lever installed and registered')
     }
   }
 }
