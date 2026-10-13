@@ -1,0 +1,18 @@
+# 昆仑 (Kunlun) preset display metadata.
+#
+# Required beside `agent.cordis.yml`: the declarer reads BOTH files, and a missing
+# `preset.yml` surfaces only as "the bundled composition is unreadable" — the preset
+# then simply never appears in the GUI, with nothing in the interface explaining why.
+#
+# Contract (see lib/composition.js `readPresetMetadata`):
+#   - a mapping, not a list
+#   - `name` MUST be a non-empty string
+#   - `order` MUST be an integer when present
+
+name: 昆仑模式
+order: 5
+description: >-
+  昆仑模式 —— 在官方 standard 预设之上叠加 7 项明确声明的增强：五个行为模块（工作上下文、
+  事实台账、退化熔断、工具目录、按需加载）、跨会话持久记忆（MCP），以及子代理多模型路由。
+  与梁神模式相比，它保留了人格纪律，并把「机制」从提示词里搬到运行时模块，
+  因此不会随上下文漂移失效。
